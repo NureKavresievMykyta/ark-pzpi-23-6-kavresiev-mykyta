@@ -1,0 +1,282 @@
+﻿﻿МІНІСТЕРСТВО ОСВІТИ І НАУКИ УКРАЇНИ
+ХАРКІВСЬКИЙ НАЦІОНАЛЬНИЙ УНІВЕРСИТЕТ РАДІОЕЛЕКТРОНІКИ
+
+ФАКУЛЬТЕТ КОМП’ЮТЕРНИХ НАУК
+КАТЕДРА ПРОГРАМНОЇ ІНЖЕНЕРІЇ
+
+
+ЗВІТ
+до практичного завдання №2
+з дисципліни «Аналіз та рефакторинг коду» на тему:
+«Методи рефакторинґу коду програмного забезпечення»
+
+
+
+
+Виконав:
+ст. гр. ПЗПІ-23-6
+Кавресєв Микита
+
+
+
+Перевірив:
+ст. викладач кафедри ПІ
+Сокорчук Ігор Петрович
+
+
+
+
+
+Харків 2025
+1 ІСТОРІЯ ЗМІН
+
+№ДатаВерсія звітуОпис змін та виправлень121.12.20251Створено звіт
+2 ЗАВДАННЯ
+     Метою практичного заняття є набуття навичок ідентифікації "запахів коду" та застосування технік рефакторингу для покращення внутрішньої структури програмного забезпечення без зміни його зовнішньої поведінки.
+     Завдання передбачає вибір трьох методів рефакторингу з книги Мартіна Фаулера або сучасних практик розробки на C#. Необхідно продемонструвати застосування цих методів на прикладах власного коду (більш складних фрагментах бізнес-логіки), навівши стан коду "До" та "Після", а також обґрунтувати доцільність змін з точки зору читабельності, підтримки та ефективності.
+     Для виконання роботи обрано наступні методи:
+- Replace Simple Property with Auto-Property (Заміна звичайної властивості на авто-властивість);
+- Replace Loop with LINQ Expression (Заміна циклу на LINQ-вираз);
+- Use Null-Coalescing Assignment (Використання оператора об’єднання з null).
+3 ОПИС ВИКОНАНОЇ РОБОТИ
+     3.1 Вступ: Значення рефакторингу в C#
+     Визначено тему роботи — практичне застосування методів рефакторингу в середовищі .NET. Сучасний C# розвивається дуже швидко, пропонуючи синтаксичний цукор, який робить код лаконічнішим. Рефакторинг дозволяє зменшити обсяг файлів, прибрати візуальний шум та знизити когнітивне навантаження на розробника, особливо в класах моделей даних та сервісах обробки.
+     3.2 Метод 1: Replace Simple Property with Auto-Property 
+     Опис проблеми: У "старому" стилі C# (до версії 3.0) для створення сутності (Entity) необхідно було оголошувати приватні поля для кожної характеристики та розписувати повні геттери й сеттери. Коли клас має 5-6 полів, це перетворює файл на стіну тексту, де важко знайти реальну логіку.
+     Код до рефакторингу: Клас EmployeeProfile, що описує співробітника. Код займає багато місця лише для зберігання даних.
+public class EmployeeProfile
+{
+    private int _id;
+    private string _firstName;
+    private string _lastName;
+    private string _department;
+    private decimal _salary;
+    private bool _isActive;
+
+    public int Id
+    {
+        get { return _id; }
+        set { _id = value; }
+    }
+
+    public string FirstName
+    {
+        get { return _firstName; }
+        set { _firstName = value; }
+    }
+
+    public string LastName
+    {
+        get { return _lastName; }
+        set { _lastName = value; }
+    }
+
+    public string Department
+    {
+        get { return _department; }
+        set { _department = value; }
+    }
+
+    public decimal Salary
+    {
+        get { return _salary; }
+        set { _salary = value; }
+    }
+    
+    public bool IsActive
+    {
+        get { return _isActive; }
+        set { _isActive = value; }
+    }
+}
+
+     Застосування методу: Застосовано синтаксис автоматичних властивостей. Компілятор самостійно створює backing fields під час компіляції.
+     Код після рефакторингу:
+public class EmployeeProfile
+{
+    public int Id { get; set; }
+    public string FirstName { get; set; }
+    public string LastName { get; set; }
+    public string Department { get; set; }
+    public decimal Salary { get; set; }
+    public bool IsActive { get; set; }
+}
+
+Переваги:
+- Обсяг коду зменшився у 5 разів (з ~40 рядків до 8);
+- Клас став читатися як чиста специфікація даних;
+- Зник ризик помилки, коли в сеттері LastName випадково присвоюють значення полю _firstName.
+     3.3 Метод 2: Replace Loop with LINQ Expression 
+     Опис проблеми: При складній обробці колекцій (фільтрація, сортування, перетворення даних в інший тип) використання циклів foreach призводить до появи "спагеті-коду". Необхідно створювати тимчасові списки, писати вкладені if та вручну керувати додаванням елементів.
+     Код до рефакторингу: Метод аналізує список транзакцій, відбирає лише успішні продажі на суму понад $500, конвертує їх у DTO (Data Transfer Object) для звіту і сортує за датою.
+     
+public List<TransactionDto> GetHighValueReport(List<Transaction> transactions)
+{
+    List<TransactionDto> reportList = new List<TransactionDto>();
+
+    foreach (var t in transactions)
+    {
+        if (t.Status == "Completed")
+        {
+            if (t.Amount > 500)
+            {
+                // Ручне створення об'єкта та мапінг полів
+                var dto = new TransactionDto
+                {
+                    TransactionId = t.Id,
+                    Summary = $"Sale: {t.ProductName} - ${t.Amount}",
+                    Date = t.CreatedAt
+                };
+                reportList.Add(dto);
+            }
+        }
+    }
+
+    // Ручне сортування бульбашкою або виклик окремого методу Sort
+    reportList.Sort((x, y) => y.Date.CompareTo(x.Date)); 
+
+    return reportList;
+}
+
+     Застосування методу: Використано LINQ для побудови декларативного запиту. Логіка фільтрації, проекції (Select) та сортування об'єднана в один ланцюжок.
+     Код після рефакторингу:
+public List<TransactionDto> GetHighValueReport(List<Transaction> transactions)
+{
+    return transactions
+        .Where(t => t.Status == "Completed" && t.Amount > 500)
+        .OrderByDescending(t => t.Date)
+        .Select(t => new TransactionDto
+        {
+            TransactionId = t.Id,
+            Summary = $"Sale: {t.ProductName} - ${t.Amount}",
+            Date = t.CreatedAt
+        })
+        .ToList();
+}
+
+
+Переваги:
+- Чіткість намірів: Код читається зверху вниз: "Відфільтруй > Відсортуй > Перетвори" 
+- Імутабельність: Немає проміжного списку reportList, стан якого змінюється в циклі;
+- Легкість підтримки: Додати нову умову (наприклад, && t.Currency == "USD") можна в один рядок, не ламаючи структуру циклу.
+     3.4 Метод 3: Use Null-Coalescing Assignment 
+     Опис проблеми: У сервісах часто використовується "відкладена ініціалізація" (Lazy Load) для підключення до бази даних, логера або кешу, щоб не витрачати ресурси, якщо вони не знадобляться. Класичний запис із перевірками if (variable == null) захаращує код методу конфігурації.
+     Код до рефакторингу: Метод налаштування сервісу, який ініціалізує залежності, якщо вони відсутні.
+private Logger _logger;
+private DatabaseConnection _dbConnection;
+private AppSettings _settings;
+
+public void ConfigureService()
+{
+    if (_settings == null)
+    {
+        _settings = LoadDefaultSettings();
+    }
+
+    if (_logger == null)
+    {
+        _logger = new FileLogger("app.log");
+    }
+
+    if (_dbConnection == null)
+    {
+        _dbConnection = new DatabaseConnection(_settings.ConnectionString);
+    }
+    
+    _logger.Log("Service configured successfully.");
+}
+
+     Застосування методу: Використано оператор ??=, який виконує присвоєння тільки в тому випадку, якщо ліва частина дорівнює null.
+     Код після рефакторингу:
+private Logger _logger;
+private DatabaseConnection _dbConnection;
+private AppSettings _settings;
+
+public void ConfigureService()
+{
+    // Ініціалізація виглядає набагато компактніше
+    _settings ??= LoadDefaultSettings();
+    _logger ??= new FileLogger("app.log");
+    
+    // Використання вже ініціалізованого settings
+    _dbConnection ??= new DatabaseConnection(_settings.ConnectionString);
+    
+    _logger.Log("Service configured successfully.");
+}
+
+Переваги:
+- Компактність: Блоки з 3-4 рядків перетворилися на однорядкові вирази.
+- Акцент на головному: Метод ConfigureService тепер показує список залежностей, а не логіку перевірки null.
+- Безпека потоків: У деяких випадках цей оператор може бути оптимізований компілятором краще, ніж ручна перевірка.
+4 ВИСНОВКИ
+   У ході виконання практичного завдання було проаналізовано та оптимізовано фрагменти коду мовою C#.
+- Застосування Auto-Properties у класі EmployeeProfile дозволило позбутися 30+ рядків шаблонного коду, покращивши огляд моделі даних;
+- Рефакторинг методу звітності GetHighValueReport за допомогою LINQ продемонстрував, як декларативний підхід спрощує складну логіку фільтрації та трансформації даних;
+- Використання оператора Null-Coalescing Assignment (??=) зробило логіку ініціалізації залежностей у методі ConfigureService прозорою та лаконічною.
+     Результати роботи підтверджують, що рефакторинг не лише покращує візуальне сприйняття коду, а й знижує ймовірність виникнення помилок при його подальшому розширенні.
+5 ВИКОРИСТАНІ ДЖЕРЕЛА
+- Martin Fowler. Refactoring: Improving the Design of Existing Code. Addison-Wesley Professional, 2nd Edition, 2018.
+- Microsoft Documentation. Auto-Implemented Properties (C# Programming Guide). URL: https://learn.microsoft.com/en-us/dotnet/csharp/programming-guide/classes-and-structs/auto-implemented-properties (дата звернення: 21.12.2025).
+- Microsoft Documentation. Language Integrated Query (LINQ). URL: https://learn.microsoft.com/en-us/dotnet/csharp/linq/ (дата звернення: 21.12.2025).
+- C# 8.0 Features. Null-coalescing assignment. URL: https://learn.microsoft.com/en-us/dotnet/csharp/language-reference/operators/null-coalescing-operator (дата звернення: 21.12.2025).
+
+
+
+ДОДАТОК А
+     Відеозапис
+	Відеозапис доповіді: https://youtu.be/NmGUHv7SI2g
+
+     Хронологічний опис відеозапису:
+00:30 - Вступ. Що таке рефакторинг? 
+01:20 - Метод 1: Replace Simple Property with Auto-Property 
+02:19 - Практичний приклад 1: Клас EmployeeProfile 
+03:38 - Метод 2: Replace Loop with LINQ Expressio 
+04:24 - Практичний приклад 2: Звіт про транзакції 
+06:13 - Метод 3: Use Null-Coalescing Assignment (??=) 
+06:59 - Практичний приклад 3: Налаштування сервісу 
+08:13 - Переваги чистого коду 
+09:15 - Інструменти для автоматизації 
+10:06 - Висновки
+
+
+ДОДАТОК Б
+     Слайди презентації:
+
+Рисунок 1 – Титульний аркуш
+
+
+Рисунок 2 – Вступ. Що таке рефакторинг?
+
+
+Рисунок 3 – Метод 1: Replace Simple Property with Auto-Property
+
+
+Рисунок 4 – Практичний приклад 1: Клас EmployeeProfile
+
+
+Рисунок 5 – Метод 2: Replace Loop with LINQ Expressio
+
+
+Рисунок 6 – Практичний приклад 2: Звіт про транзакції
+
+
+Рисунок 7 – Метод 3: Use Null-Coalescing Assignment (??=)
+
+
+Рисунок  8 – Практичний приклад 3: Налаштування сервісу
+
+
+Рисунок 9 – Переваги чистого коду
+
+
+Рисунок 10 – Інструменти для автоматизації
+
+
+Рисунок 11 – Висновки
+
+
+Рисунок 12 – Використані джерела
+
+2
+
+
